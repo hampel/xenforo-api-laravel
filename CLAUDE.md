@@ -83,6 +83,20 @@ like clutter to be tidied away:
   `ConfigurationTest::registering_the_provider_binds_the_manager_and_merges_the_config`
   registers it again against an application built in the test body. Both paths were probed
   with `trigger_error(..., E_USER_DEPRECATED)`; both exit non-zero.
+- **Laravel Zero does not bind the HTTP client factory, and Testbench cannot see that.**
+  Laravel binds `Illuminate\Http\Client\Factory` as a singleton in
+  `FoundationServiceProvider`; Laravel Zero's provider set is Build, Cache, Collision,
+  CommandRecorder, Composer, Filesystem, GitVersion and NullLogger, and `app:install http`
+  only runs `composer require illuminate/http`. Unbound, every `make()` builds a fresh
+  factory, so the package holds a different one from the facade and `Http::fake()` does not
+  intercept — the request reaches the real forum. `singletonIf` in the provider closes it.
+
+  `Http::fake()` hides the ordering, which is what makes it dangerous: `fake()` calls
+  `Facade::swap()`, which binds its instance into the container, so faking *before* the
+  client is resolved happens to work and faking after does not. `tests/LaravelZeroTest.php`
+  builds the container by hand because Testbench always boots a full application and can
+  never reach this.
+
 - **`composer-require-checker` carries the undeclared-dependency check here, not the
   dev-free PHPStan job.** `laravel/framework` `replace`s every `illuminate/*` component, so
   the framework supplies every `Illuminate` symbol whether its component was declared or

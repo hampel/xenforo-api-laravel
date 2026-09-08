@@ -24,8 +24,17 @@ different exceptions rather than both becoming an unsuccessful response.
 
 PHP 8.3 or later, and Laravel 12 or 13.
 
-Laravel Zero works too — providers, config and facades behave identically. It needs the
-HTTP component, which a Laravel Zero application opts into with `php <app> app:install http`.
+Laravel Zero works too — providers, config and facades behave identically — and needs the
+HTTP component, which an application opts into with `php <app> app:install http` (that
+command runs `composer require illuminate/http` and nothing else).
+
+One difference is handled for you and worth knowing about. Laravel binds
+`Illuminate\Http\Client\Factory` as a singleton in `FoundationServiceProvider`, which a
+Laravel Zero application does not register — and the HTTP component installs the classes
+without binding anything. Unbound, the container builds a fresh factory on every
+resolution, so the one this package holds is not the one `Http::fake()` configures, and the
+fake silently fails to intercept: the request goes to the real forum. This package binds a
+singleton when nothing else has, so the behaviour is the same on both platforms.
 
 ## Installation
 

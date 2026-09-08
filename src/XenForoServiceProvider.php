@@ -7,6 +7,8 @@ namespace Hampel\XenForo\Api\Laravel;
 use GuzzleHttp\Psr7\HttpFactory as Psr17Factory;
 use Hampel\XenForo\Api\Laravel\Http\PendingRequestClient;
 use Illuminate\Contracts\Config\Repository as Config;
+use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Contracts\Container\Container;
 use Illuminate\Http\Client\Factory as HttpClientFactory;
 use Illuminate\Support\ServiceProvider;
 use Psr\Http\Client\ClientInterface;
@@ -27,6 +29,25 @@ final class XenForoServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/xenforo.php', 'xenforo');
+
+        // Laravel binds the HTTP client factory as a singleton in FoundationServiceProvider,
+        // which a full application registers and a Laravel Zero one does NOT - its provider
+        // set is Build, Cache, Collision, CommandRecorder, Composer, Filesystem, GitVersion
+        // and NullLogger, and nothing there binds it. Unbound, the container builds a fresh
+        // Factory on every make(), so the one this package holds is not the one the Http
+        // facade configures, and Http::fake() silently fails to intercept: the request goes
+        // to the real forum.
+        //
+        // Http::fake() hides the ordering, which is what makes it dangerous. fake() calls
+        // Facade::swap(), which binds its instance into the container - so faking BEFORE the
+        // client is resolved happens to work, and faking after it does not. Binding a
+        // singleton here removes the ordering question on both platforms.
+        //
+        // singletonIf, so a full Laravel application keeps the framework's own binding and
+        // this is a no-op there.
+        $this->app->singletonIf(HttpClientFactory::class, static fn (Container $app): HttpClientFactory => new HttpClientFactory(
+            $app->bound(Dispatcher::class) ? $app->make(Dispatcher::class) : null,
+        ));
 
         // bindIf, so an application that has already bound PSR-17 factories keeps its own.
         // Guzzle's fills both roles and laravel/framework requires it, so the fallback
