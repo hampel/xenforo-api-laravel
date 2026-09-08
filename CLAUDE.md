@@ -104,6 +104,19 @@ like clutter to be tidied away:
   `vendor/illuminate/` for the checker to attribute them to. A *new* `Illuminate` symbol
   appearing there is a prompt to check `require`, not to extend the list.
 
+  **It is not in `composer check`, so it does not run with the rest.** The tool lives
+  outside the package by design, which means nothing local re-runs it when an import
+  changes and only CI notices. Adding `Illuminate\Contracts\Events\Dispatcher` to the
+  provider is what caught this out: the checker had been run clean before that import
+  existed and was not run again, so the first red build was the release push. **Run it by
+  hand after adding or changing any `use` in `src/`:**
+
+  ```bash
+  mkdir -p /tmp/crc && composer -d /tmp/crc require maglnet/composer-require-checker
+  /tmp/crc/vendor/bin/composer-require-checker check \
+      --config-file=.github/composer-require-checker.json composer.json
+  ```
+
 ## The facade's annotations are the only types it has
 
 `XenForo::users()` goes through the manager's `__call()` and returns `mixed`; the

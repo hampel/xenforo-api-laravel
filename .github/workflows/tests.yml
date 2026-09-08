@@ -107,12 +107,13 @@ jobs:
       # PHPStan it comes from outside; run against the --no-dev tree above, because that is
       # the closure a consumer installs.
       #
-      # The whitelist is not a way to silence findings. It holds four Illuminate symbols
+      # The whitelist is not a way to silence findings. It holds five Illuminate symbols
       # that can never resolve, because laravel/framework "replace"s every illuminate/*
       # component - so Composer installs the framework and there is no vendor/illuminate/
       # for the checker to attribute them to. Verified on the --no-dev tree: vendor/laravel
       # exists, vendor/illuminate does not. A NEW Illuminate symbol appearing here is a
-      # prompt to check its component is in "require", not to extend the list on sight.
+      # prompt to check its component is in "require", not to extend the list on sight;
+      # each of these five was checked that way, and each maps to a component in "require".
       - run: |
           mkdir -p /tmp/crc
           composer -d /tmp/crc require maglnet/composer-require-checker --no-progress
