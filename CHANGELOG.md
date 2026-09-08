@@ -1,0 +1,7 @@
+CHANGELOG
+=========
+
+Unreleased
+----------
+
+* Initial release
