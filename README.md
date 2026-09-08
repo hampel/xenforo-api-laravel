@@ -165,6 +165,20 @@ public function __construct(private readonly XenForoManager $forums) {}
 $this->forums->forum('support')->users()->get(1);
 ```
 
+### Returning an entity
+
+Entities implement `\JsonSerializable` and serialise to the forum's own payload, so handing
+one to a JSON response gives you what the API answered rather than the entity's internals:
+
+```php
+return response()->json(XenForo::users()->get(1));
+```
+
+Fields the credential is not allowed to see are *absent* from that payload rather than null,
+which is the distinction XenForo itself draws — a permission failure and a genuinely empty
+field are not the same thing, and `ApiResponse::has()` is how to tell them apart. Add-on
+fields the specification does not describe survive too.
+
 ### Errors
 
 The core package's exceptions arrive untouched. Telling them apart is the reason to use it

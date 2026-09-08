@@ -11,6 +11,7 @@ use Hampel\XenForo\Api\Generated\Schema\Thread;
 use Hampel\XenForo\Api\Generated\Schema\User;
 use Hampel\XenForo\Api\Laravel\Facades\XenForo;
 use Hampel\XenForo\Api\Laravel\XenForoManager;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
@@ -86,6 +87,36 @@ final class ReadmeExamplesTest extends TestCase
         $client->users()->get(1);
 
         Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'api_bypass_permissions=1'));
+    }
+
+    #[Test]
+    public function an_entity_handed_to_a_json_response_serialises_to_the_forums_payload(): void
+    {
+        // The README's `return response()->json(XenForo::users()->get(1));`. This asserts
+        // Laravel's JSON response path honours the entity's \JsonSerializable, not that the
+        // core package serialises correctly - that is covered in the core package's own
+        // suite and duplicating it would be this package testing that one.
+        Http::fake([
+            'forum.example.com/*' => Http::response(['user' => [
+                'user_id' => 7,
+                'username' => 'ada',
+                'custom_addon_field' => 'value the specification has never heard of',
+            ]]),
+        ]);
+
+        $response = new JsonResponse(XenForo::users()->get(7));
+        $decoded = json_decode((string) $response->getContent(), true);
+
+        $this->assertSame([
+            'user_id' => 7,
+            'username' => 'ada',
+            'custom_addon_field' => 'value the specification has never heard of',
+        ], $decoded);
+
+        // Absent rather than null: the credential may not see it, which is not the same
+        // thing as the forum answering null, and the README says so. Named explicitly
+        // because that is the property, even though the assertion above covers it.
+        $this->assertArrayNotHasKey('email', $decoded);
     }
 
     #[Test]
