@@ -183,6 +183,26 @@ final class ManagerTest extends TestCase
         $this->manager()->__call('noSuchEndpoint', []);
     }
 
+    #[Test]
+    public function an_empty_inventory_is_inspectable_rather_than_fatal(): void
+    {
+        // An application whose forum list comes from a file rather than from config needs
+        // to report WHY it is empty - a missing or unparseable inventory - rather than have
+        // every command die. Nothing here throws until a specific forum is named, so a
+        // diagnostic command can resolve the manager and describe the situation.
+        $this->container()->make(Config::class)->set('xenforo.forums', []);
+
+        $manager = $this->manager();
+
+        $this->assertSame([], $manager->configuredForums());
+        $this->assertSame('main', $manager->getDefaultForum());
+
+        $this->expectException(UnknownForum::class);
+        $this->expectExceptionMessage('No forums are configured');
+
+        $manager->forum('somesite');
+    }
+
     /**
      * @param  array<string, mixed>  $settings
      */
