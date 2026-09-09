@@ -1,6 +1,12 @@
 # hampel/xenforo-api-laravel
 
 [![Tests](https://github.com/hampel/xenforo-api-laravel/actions/workflows/tests.yml/badge.svg)](https://github.com/hampel/xenforo-api-laravel/actions/workflows/tests.yml)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/hampel/xenforo-api-laravel.svg?style=flat-square)](https://packagist.org/packages/hampel/xenforo-api-laravel)
+[![Total Downloads](https://img.shields.io/packagist/dt/hampel/xenforo-api-laravel.svg?style=flat-square)](https://packagist.org/packages/hampel/xenforo-api-laravel)
+[![Open Issues](https://img.shields.io/github/issues-raw/hampel/xenforo-api-laravel.svg?style=flat-square)](https://github.com/hampel/xenforo-api-laravel/issues)
+[![License](https://img.shields.io/packagist/l/hampel/xenforo-api-laravel.svg?style=flat-square)](https://packagist.org/packages/hampel/xenforo-api-laravel)
+
+By [Simon Hampel](mailto:simon@hampelgroup.com)
 
 Laravel integration for [`hampel/xenforo-api`][core] — a service provider, a manager for
 named forums, and a facade.
