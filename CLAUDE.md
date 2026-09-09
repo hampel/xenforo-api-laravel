@@ -109,7 +109,9 @@ like clutter to be tidied away:
   changes and only CI notices. Adding `Illuminate\Contracts\Events\Dispatcher` to the
   provider is what caught this out: the checker had been run clean before that import
   existed and was not run again, so the first red build was the release push. **Run it by
-  hand after adding or changing any `use` in `src/`:**
+  hand after adding or changing any `use` in `src/`** — CI gets the binary from `setup-php`'s
+  `tools:` input, which has no equivalent on a workstation, so the local recipe installs it
+  into a scratch directory instead:
 
   ```bash
   mkdir -p /tmp/crc && composer -d /tmp/crc require maglnet/composer-require-checker

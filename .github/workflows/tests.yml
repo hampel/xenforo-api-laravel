@@ -77,15 +77,16 @@ jobs:
         with:
           php-version: '8.3'
           coverage: none
+          # Both are dev dependencies the install below deletes, and both have to run from
+          # OUTSIDE the package's vendor tree. For the checker that is merely tidy; for
+          # PHPStan it is load-bearing. Run in place, PHPStan picks up the autoloader
+          # beside it, so every package that tree happens to have installed resolves in the
+          # analysed code - and the check then passes on exactly the class it exists to
+          # catch. setup-php installs both as standalone binaries on PATH, which satisfies
+          # that by construction rather than by remembering to.
+          tools: phpstan, composer-require-checker
 
       - run: composer install --no-dev --prefer-dist --no-progress
-
-      # PHPStan is itself a dev dependency, so --no-dev just deleted it. It has to come
-      # from outside the package. composer -d does not create the directory, so mkdir
-      # first or the step dies with "Invalid working directory specified".
-      - run: |
-          mkdir -p /tmp/phpstan
-          composer -d /tmp/phpstan require phpstan/phpstan --no-progress
 
       # -c is not optional. Without it PHPStan discovers the package's own phpstan.neon,
       # which points at tests/ and includes larastan - neither of which survives --no-dev -
@@ -97,15 +98,16 @@ jobs:
       # symbol whether its component was declared or not and nothing here looks wrong. The
       # checker below is what actually carries it.
       - run: >
-          /tmp/phpstan/vendor/bin/phpstan analyse
+          phpstan analyse
           -c .github/phpstan-nodev.neon
           --autoload-file=vendor/autoload.php --no-progress
 
       # composer-require-checker maps each symbol back to the package that supplies it and
       # fails on anything outside "require". It also names an undeclared ext-*, which
-      # nothing else catches. It is a dev tool the package does not depend on, so like
-      # PHPStan it comes from outside; run against the --no-dev tree above, because that is
-      # the closure a consumer installs.
+      # nothing else catches. Run against the --no-dev tree above, because that is the
+      # closure a consumer installs - though note the tree is not what makes it correct:
+      # its known-symbol set comes from "require", so it reports a symbol supplied by a dev
+      # dependency with that dependency still sitting in vendor/.
       #
       # The whitelist is not a way to silence findings. It holds five Illuminate symbols
       # that can never resolve, because laravel/framework "replace"s every illuminate/*
@@ -114,12 +116,8 @@ jobs:
       # exists, vendor/illuminate does not. A NEW Illuminate symbol appearing here is a
       # prompt to check its component is in "require", not to extend the list on sight;
       # each of these five was checked that way, and each maps to a component in "require".
-      - run: |
-          mkdir -p /tmp/crc
-          composer -d /tmp/crc require maglnet/composer-require-checker --no-progress
-
       - run: >
-          /tmp/crc/vendor/bin/composer-require-checker check
+          composer-require-checker check
           --config-file=.github/composer-require-checker.json
           composer.json
 
