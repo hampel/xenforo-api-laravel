@@ -1,4 +1,4 @@
-# hampel/xenforo-api-laravel
+# XenForo API for Laravel
 
 [![Tests](https://github.com/hampel/xenforo-api-laravel/actions/workflows/tests.yml/badge.svg)](https://github.com/hampel/xenforo-api-laravel/actions/workflows/tests.yml)
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/hampel/xenforo-api-laravel.svg?style=flat-square)](https://packagist.org/packages/hampel/xenforo-api-laravel)
@@ -30,17 +30,9 @@ different exceptions rather than both becoming an unsuccessful response.
 
 PHP 8.3 or later, and Laravel 12 or 13.
 
-Laravel Zero works too — providers, config and facades behave identically — and needs the
-HTTP component, which an application opts into with `php <app> app:install http` (that
-command runs `composer require illuminate/http` and nothing else).
-
-One difference is handled for you and worth knowing about. Laravel binds
-`Illuminate\Http\Client\Factory` as a singleton in `FoundationServiceProvider`, which a
-Laravel Zero application does not register — and the HTTP component installs the classes
-without binding anything. Unbound, the container builds a fresh factory on every
-resolution, so the one this package holds is not the one `Http::fake()` configures, and the
-fake silently fails to intercept: the request goes to the real forum. This package binds a
-singleton when nothing else has, so the behaviour is the same on both platforms.
+Laravel Zero is supported too, with two extra steps covered under Installation. It needs the
+HTTP component, which an application opts into with `php <app> app:install http` (that command
+runs `composer require illuminate/http` and nothing else).
 
 ## Installation
 
@@ -48,12 +40,37 @@ singleton when nothing else has, so the behaviour is the same on both platforms.
 composer require hampel/xenforo-api-laravel
 ```
 
-The provider and the `XenForo` alias are discovered automatically. Publish the config file
-if you want to edit it:
+In a Laravel application the provider and the `XenForo` alias are discovered automatically.
+Publish the config file if you want to edit it:
 
 ```bash
 php artisan vendor:publish --tag=xenforo-config
 ```
+
+### Laravel Zero
+
+**Laravel Zero switches package discovery off, so register the provider yourself** in
+`config/app.php`:
+
+```php
+'providers' => [
+    App\Providers\AppServiceProvider::class,
+    Hampel\XenForo\Api\Laravel\XenForoServiceProvider::class,
+],
+```
+
+The `XenForo` alias comes from the same discovery, so it is not registered either — import
+`Hampel\XenForo\Api\Laravel\Facades\XenForo` by its class name. To edit the config, copy
+`vendor/hampel/xenforo-api-laravel/config/xenforo.php` into the application's `config/`.
+
+Registering the provider also closes a gap in `Http::fake()`. Laravel binds
+`Illuminate\Http\Client\Factory` as a singleton in `FoundationServiceProvider`, which a
+Laravel Zero application does not register, and the HTTP component installs the classes
+without binding anything. Unbound, the container builds a fresh factory on every resolution,
+so the one this package holds is not the one `Http::fake()` configures, and the fake would
+miss: the request would go to the real forum. The provider binds a singleton when nothing else
+has. Without the provider nothing is bound at all, and resolving a client fails with a
+`BindingResolutionException` rather than reaching the network.
 
 ## Configuration
 

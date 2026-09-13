@@ -122,6 +122,27 @@ like clutter to be tidied away:
   builds the container by hand because Testbench always boots a full application and can
   never reach this.
 
+- **Laravel Zero ignores package discovery, so the fix above only runs if the consumer
+  registers the provider by hand.** `LaravelZero\Framework\Application::registerBaseBindings()`
+  empties the `PackageManifest` — "Ignores auto-discovery" — before
+  `registerConfiguredProviders()` reads providers from it. So `extra.laravel` never reaches a
+  Zero application: neither the provider nor the `XenForo` alias. The README tells Zero
+  consumers to list the provider in `config/app.php`.
+
+  **Reading only `registerConfiguredProviders()` gives the opposite answer**, which is how this
+  package's documentation got it wrong: that method visibly splices the manifest's providers in,
+  and the line that emptied the manifest is in a different method. The README claimed discovery
+  worked in Zero from release until 2026-09-13, when the first Laravel Zero consumer measured
+  `ClientInterface` unbound with the package installed and not listed.
+
+  **The suite cannot test this, and the reason is resolution, not effort.**
+  `LaravelZeroTest` builds an `Illuminate\Foundation\Application` and calls `register()`
+  directly, which models the missing `FoundationServiceProvider` and skips provider loading
+  entirely. Going through Zero's own loading would need `laravel-zero/framework` in
+  `require-dev`, which requires `illuminate/*` `^13.24` — unresolvable on the Laravel 12 CI
+  corner — and ships a fork of `Illuminate\Foundation` that would collide with the one
+  Testbench installs.
+
 - **`composer-require-checker` carries the undeclared-dependency check here, not the
   dev-free PHPStan job.** `laravel/framework` `replace`s every `illuminate/*` component, so
   the framework supplies every `Illuminate` symbol whether its component was declared or
