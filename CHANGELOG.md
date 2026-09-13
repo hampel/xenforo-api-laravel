@@ -1,8 +1,8 @@
 CHANGELOG
 =========
 
-Unreleased
-----------
+1.1.0 (2026-09-14)
+------------------
 
 * `XenForoManager::build()` makes a client from an array of settings, for a forum that is not
   in `config/xenforo.php`. It takes the same keys as an entry under `xenforo.forums`, applies
