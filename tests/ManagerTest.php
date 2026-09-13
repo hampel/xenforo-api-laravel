@@ -203,6 +203,86 @@ final class ManagerTest extends TestCase
         $manager->forum('somesite');
     }
 
+    #[Test]
+    public function build_makes_a_client_for_a_forum_that_is_not_configured(): void
+    {
+        // The case it exists for: an application whose forums live outside config. The
+        // configured list is empty, and build() still succeeds.
+        $this->container()->make(Config::class)->set('xenforo.forums', []);
+
+        $client = $this->manager()->build(['url' => 'https://elsewhere.example.com', 'key' => 'k']);
+
+        $this->assertSame('https://elsewhere.example.com/api', $client->config()->baseUri);
+        $this->assertInstanceOf(ApiKey::class, $client->authentication());
+        $this->assertSame([], $this->manager()->configuredForums());
+    }
+
+    #[Test]
+    public function build_resolves_credentials_and_version_the_way_configuration_does(): void
+    {
+        $client = $this->manager()->build([
+            'url' => 'https://elsewhere.example.com',
+            'key' => 'super-key',
+            'user' => 42,
+            'version' => 1,
+        ]);
+
+        $credential = $client->authentication();
+
+        $this->assertInstanceOf(SuperUserKey::class, $credential);
+        $this->assertSame(42, $credential->actingAs);
+        $this->assertSame(1, $client->config()->version);
+
+        $this->assertInstanceOf(Guest::class, $this->manager()->build(['url' => 'https://e.example.com'])->authentication());
+        $this->assertInstanceOf(
+            BearerToken::class,
+            $this->manager()->build(['url' => 'https://e.example.com', 'key' => 'k', 'bearer' => 't'])->authentication(),
+        );
+    }
+
+    #[Test]
+    public function build_is_not_memoised(): void
+    {
+        // Laravel's managers build an on-demand instance fresh each time and leave keeping it
+        // to the caller. Memoising here would need a key, and settings have no name.
+        $settings = ['url' => 'https://elsewhere.example.com', 'key' => 'k'];
+
+        $this->assertNotSame($this->manager()->build($settings), $this->manager()->build($settings));
+    }
+
+    #[Test]
+    public function build_refuses_settings_without_a_url(): void
+    {
+        // The message names build() rather than config/xenforo.php, where these settings did
+        // not come from.
+        $this->expectException(InvalidConfiguration::class);
+        $this->expectExceptionMessage('passed to XenForoManager::build() have no url');
+
+        $this->manager()->build(['key' => 'k']);
+    }
+
+    #[Test]
+    public function build_refuses_an_acting_user_without_a_key(): void
+    {
+        $this->expectException(InvalidConfiguration::class);
+        $this->expectExceptionMessage('passed to XenForoManager::build() names a user to act as but has no key');
+
+        $this->manager()->build(['url' => 'https://elsewhere.example.com', 'user' => 7]);
+    }
+
+    #[Test]
+    public function a_configured_forum_without_a_url_still_points_at_the_config_file(): void
+    {
+        // Splitting the builder for build() must not lose the hint that tells a configured
+        // forum's owner where to look.
+        $this->configure('nowhere', ['key' => 'k']);
+
+        $this->expectException(InvalidConfiguration::class);
+        $this->expectExceptionMessage('Set it in config/xenforo.php');
+
+        $this->manager()->forum('nowhere');
+    }
+
     /**
      * @param  array<string, mixed>  $settings
      */

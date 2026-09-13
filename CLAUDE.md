@@ -17,7 +17,7 @@ composer format         # pint
 | path | what it is |
 |---|---|
 | `src/Http/PendingRequestClient.php` | the PSR-18 adapter over Laravel's HTTP client |
-| `src/XenForoManager.php` | one client per configured forum, memoised |
+| `src/XenForoManager.php` | one client per configured forum, memoised; `build()` for one that is not |
 | `src/XenForoServiceProvider.php` | the bindings, the merged config, the publish tag |
 | `src/Facades/XenForo.php` | the facade, and the `@method` block that types it |
 | `src/Exception/` | configuration failures, in the core package's hierarchy |

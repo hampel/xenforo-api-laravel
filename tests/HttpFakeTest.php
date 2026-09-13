@@ -144,4 +144,21 @@ final class HttpFakeTest extends TestCase
         $this->assertSame('edsger', $user->username);
         Http::assertSent(fn (Request $request): bool => $request->hasHeader('XF-Api-User', '3'));
     }
+
+    #[Test]
+    public function a_built_client_sends_through_the_faked_transport(): void
+    {
+        // What build() gives a config-less application over constructing a Client itself:
+        // the package's transport, so the same fakes, recorder and stray-request guard reach
+        // a forum that was never in config.
+        Http::preventStrayRequests();
+        Http::fake([
+            'elsewhere.example.com/*' => Http::response(['user' => ['user_id' => 5, 'username' => 'barbara']]),
+        ]);
+
+        $client = XenForo::build(['url' => 'https://elsewhere.example.com', 'key' => 'built-key']);
+
+        $this->assertSame('barbara', $client->users()->get(5)->username);
+        Http::assertSent(fn (Request $request): bool => $request->hasHeader('XF-Api-Key', 'built-key'));
+    }
 }

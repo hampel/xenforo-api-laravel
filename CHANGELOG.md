@@ -1,6 +1,20 @@
 CHANGELOG
 =========
 
+Unreleased
+----------
+
+* `XenForoManager::build()` makes a client from an array of settings, for a forum that is not
+  in `config/xenforo.php`. It takes the same keys as an entry under `xenforo.forums`, applies
+  the same validation and credential selection, sends through the same transport, and is not
+  memoised
+* `InvalidConfiguration::missingUrl()` and `actingUserWithoutKey()` accept `null` for settings
+  passed to `build()`
+* README: Laravel Zero does not discover packages, so the provider must be listed in
+  `config/app.php` and the facade imported by class name
+* README and `PendingRequestClient` docblock: `RequestSending` fires for requests the API
+  client makes; `ResponseReceived` and `ConnectionFailed` do not
+
 1.0.0 (2026-09-09)
 ------------------
 

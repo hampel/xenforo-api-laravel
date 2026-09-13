@@ -188,6 +188,44 @@ public function __construct(private readonly XenForoManager $forums) {}
 $this->forums->forum('support')->users()->get(1);
 ```
 
+### Forums that are not in configuration
+
+When the forum list lives somewhere other than `config/xenforo.php` — a database table,
+per-tenant settings, a file read on demand to keep API keys out of the config repository —
+build a client from an array instead:
+
+```php
+$client = XenForo::build([
+    'url' => $forum->url,
+    'key' => $forum->api_key,
+]);
+
+$user = $client->users()->get(1);
+```
+
+The array takes the same keys as an entry under `xenforo.forums`, and gets the same validation
+and choice of credential. The client sends through the same transport, so `Http::fake()` and
+`Http::preventStrayRequests()` reach it. Each call builds a new client and nothing is memoised,
+so keep the one you get.
+
+The transport is bound as `Psr\Http\Client\ClientInterface`, with PSR-17 factories beside it,
+for constructing a `Hampel\XenForo\Api\Client` directly:
+
+```php
+use Hampel\XenForo\Api\Client;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestFactoryInterface;
+use Psr\Http\Message\StreamFactoryInterface;
+
+$client = new Client(
+    $config,
+    $credential,
+    app(ClientInterface::class),
+    app(RequestFactoryInterface::class),
+    app(StreamFactoryInterface::class),
+);
+```
+
 ### Returning an entity
 
 Entities implement `\JsonSerializable` and serialise to the forum's own payload, so handing

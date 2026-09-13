@@ -61,6 +61,7 @@ use Illuminate\Support\Facades\Facade;
  * `XenForo::forum()->endpoint(Foo::class)` where the generic return matters.
  *
  * @method static Client forum(?string $name = null)
+ * @method static Client build(array<string, mixed> $settings)
  * @method static string getDefaultForum()
  * @method static list<string> configuredForums()
  * @method static Config config()

@@ -21,7 +21,7 @@ use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * One XenForo client per configured forum.
+ * One XenForo client per configured forum, and on demand for a forum that is not.
  *
  * Every application that has used this API on more than one forum has written this class:
  * a URL and a credential per site, a default, and something to look one up by name. It is
@@ -63,7 +63,28 @@ final class XenForoManager
     {
         $name ??= $this->getDefaultForum();
 
-        return $this->forums[$name] ??= $this->build($name);
+        return $this->forums[$name] ??= $this->resolve($name);
+    }
+
+    /**
+     * A client for a forum that is not in the configuration.
+     *
+     * For an application whose forums live somewhere other than config/xenforo.php - a database
+     * table, per-tenant settings, a file read on demand to keep API keys out of the config
+     * repository. The settings take the same keys as an entry under xenforo.forums, and get the
+     * same validation and the same choice of credential, over the same transport:
+     *
+     *     $client = XenForo::build(['url' => $url, 'key' => $key, 'user' => $userId]);
+     *
+     * Not memoised, and not given a name: each call builds a new client, which is the
+     * caller's to keep. This is the shape of Laravel's own DatabaseManager::build() and
+     * MailManager::build().
+     *
+     * @param  array<string, mixed>  $settings
+     */
+    public function build(array $settings): Client
+    {
+        return $this->make(null, $settings);
     }
 
     public function getDefaultForum(): string
@@ -85,7 +106,7 @@ final class XenForoManager
         return is_array($forums) ? array_values(array_filter(array_keys($forums), 'is_string')) : [];
     }
 
-    private function build(string $name): Client
+    private function resolve(string $name): Client
     {
         $settings = $this->config->get('xenforo.forums.' . $name);
 
@@ -93,6 +114,15 @@ final class XenForoManager
             throw UnknownForum::named($name, $this->configuredForums());
         }
 
+        return $this->make($name, $settings);
+    }
+
+    /**
+     * @param  string|null  $name  the configured forum's name, or null for build()
+     * @param  array<mixed>  $settings
+     */
+    private function make(?string $name, array $settings): Client
+    {
         $url = $this->string($settings, 'url');
 
         if ($url === null) {
@@ -120,9 +150,10 @@ final class XenForoManager
      * here - it is per-call by nature, and `SuperUserKey::withBypassPermissions()` is one
      * line at the call site.
      *
+     * @param  string|null  $name  as for make()
      * @param  array<mixed>  $settings
      */
-    private function credential(string $name, array $settings): Authentication
+    private function credential(?string $name, array $settings): Authentication
     {
         $bearer = $this->string($settings, 'bearer');
 

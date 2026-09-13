@@ -4,17 +4,23 @@ declare(strict_types=1);
 
 namespace Hampel\XenForo\Api\Laravel\Tests;
 
+use Hampel\XenForo\Api\Authentication\ApiKey;
 use Hampel\XenForo\Api\Authentication\SuperUserKey;
+use Hampel\XenForo\Api\Client;
+use Hampel\XenForo\Api\Config;
 use Hampel\XenForo\Api\Exception\MalformedResponseException;
 use Hampel\XenForo\Api\Generated\Schema\Node;
 use Hampel\XenForo\Api\Generated\Schema\Thread;
 use Hampel\XenForo\Api\Generated\Schema\User;
 use Hampel\XenForo\Api\Laravel\Facades\XenForo;
 use Hampel\XenForo\Api\Laravel\XenForoManager;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestFactoryInterface;
+use Psr\Http\Message\StreamFactoryInterface;
 
 /**
  * The README's examples, run.
@@ -139,5 +145,48 @@ final class ReadmeExamplesTest extends TestCase
         Http::fake(['forum.example.com/*' => Http::response(['forum' => ['node_id' => 2, 'title' => 'General']])]);
 
         $this->assertInstanceOf(Node::class, XenForo::forums()->get(2));
+    }
+
+    #[Test]
+    public function a_forum_not_in_configuration_is_built_the_way_the_readme_says(): void
+    {
+        $forum = (object) ['url' => 'https://elsewhere.example.com', 'api_key' => 'built-key'];
+
+        Http::fake([
+            'elsewhere.example.com/*' => Http::response(['user' => ['user_id' => 1, 'username' => 'ada']]),
+        ]);
+
+        $client = XenForo::build([
+            'url' => $forum->url,
+            'key' => $forum->api_key,
+        ]);
+
+        $user = $client->users()->get(1);
+
+        $this->assertSame('ada', $user->username);
+    }
+
+    #[Test]
+    public function a_client_constructed_on_the_bound_transport_is_faked_the_way_the_readme_says(): void
+    {
+        // The README's direct construction. Resolving the bound interfaces is what makes a
+        // hand-built client share the package's transport rather than bypass it.
+        Http::preventStrayRequests();
+        Http::fake([
+            'elsewhere.example.com/*' => Http::response(['user' => ['user_id' => 1, 'username' => 'ada']]),
+        ]);
+
+        $config = new Config('https://elsewhere.example.com');
+        $credential = new ApiKey('direct-key');
+
+        $client = new Client(
+            $config,
+            $credential,
+            app(ClientInterface::class),
+            app(RequestFactoryInterface::class),
+            app(StreamFactoryInterface::class),
+        );
+
+        $this->assertSame('ada', $client->users()->get(1)->username);
     }
 }
