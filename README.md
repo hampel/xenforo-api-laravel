@@ -303,6 +303,10 @@ that everything must go through, makes this package use it:
 $this->app->singleton('xenforo.http_client', fn () => $policyClient);
 ```
 
+The binding can go in any service provider. This package only binds the key if nothing has
+yet, so the override holds whether its provider registers before or after this one, including in
+Laravel Zero, where the order is the `providers` list.
+
 Proxy and CA settings don't need a replacement: set them with `Http::globalOptions()`, which
 reaches this package's requests and keeps them visible to `Http::fake()`.
 

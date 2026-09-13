@@ -5,8 +5,9 @@ Unreleased
 ----------
 
 * **Breaking:** the transport is bound under the container key `xenforo.http_client` instead of
-  `Psr\Http\Client\ClientInterface`. Rebind `xenforo.http_client` to replace it; binding
-  `ClientInterface` no longer affects this package
+  `Psr\Http\Client\ClientInterface`, and only when nothing has bound that key yet. Rebind
+  `xenforo.http_client` from any service provider to replace it; binding `ClientInterface` no
+  longer affects this package
 * The service provider no longer binds `Psr\Http\Client\ClientInterface`
 * `InvalidConfiguration::httpClientNotPsr18()` is raised when `xenforo.http_client` does not resolve
   to a PSR-18 client

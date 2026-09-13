@@ -70,7 +70,12 @@ final class XenForoServiceProvider extends ServiceProvider
         $this->app->bindIf(RequestFactoryInterface::class, static fn (): RequestFactoryInterface => new Psr17Factory());
         $this->app->bindIf(StreamFactoryInterface::class, static fn (): StreamFactoryInterface => new Psr17Factory());
 
-        $this->app->singleton(self::HTTP_CLIENT, function (): ClientInterface {
+        // singletonIf, so an application's own binding of the key is kept whichever provider
+        // registers first. A full Laravel application registers discovered package providers
+        // before its own, so an override there comes after either way. Laravel Zero runs no
+        // discovery and registers in config/app.php order, where an AppServiceProvider commonly
+        // sits above this one - and singleton() would silently replace its override.
+        $this->app->singletonIf(self::HTTP_CLIENT, function (): ClientInterface {
             $config = $this->app->make(Config::class);
 
             // A resolver rather than the factory itself: looked up on every send, so it is

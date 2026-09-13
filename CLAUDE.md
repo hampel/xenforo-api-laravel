@@ -95,7 +95,13 @@ like clutter to be tidied away:
   it up silently would also put the traffic outside `Http::fake()`.
 
   **It is a convention shared by the four Laravel API wrappers**, so an application meets one
-  override style: each binds `<config key>.http_client`. The PSR-17 `bindIf()` calls and the
+  override style: each binds `<config key>.http_client`, **with `singletonIf()`, not
+  `singleton()`.** A full Laravel application registers discovered package providers before its
+  own (`Application::registerConfiguredProviders()` splices them in ahead), so an override there
+  always comes later. Laravel Zero runs no discovery and registers in `config/app.php` order,
+  where an `AppServiceProvider` commonly sits above the package, and `singleton()` would silently
+  replace its override. `SharedBindingTest::an_application_override_of_the_packages_key_is_kept`
+  fails in the before-order with `singleton()`. The PSR-17 `bindIf()` calls and the
   `singletonIf()` for Laravel's HTTP factory stay as they are — stateless or deliberately shared.
 
   Found on 2026-09-14 in an application with three wrappers installed, where every manager sent

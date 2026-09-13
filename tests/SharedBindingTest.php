@@ -44,8 +44,8 @@ final class SharedBindingTest extends BaseTestCase
     public static function orders(): array
     {
         return [
-            'sibling registered before this package' => [true],
-            'sibling registered after this package' => [false],
+            'the other provider registered before this package' => [true],
+            'the other provider registered after this package' => [false],
         ];
     }
 
@@ -130,11 +130,44 @@ final class SharedBindingTest extends BaseTestCase
         }
     }
 
+    #[Test]
+    #[DataProvider('orders')]
+    public function an_application_override_of_the_packages_key_is_kept(bool $overrideFirst): void
+    {
+        // The documented override point has to hold whichever order the providers register in.
+        // A full Laravel application registers discovered package providers before its own, so
+        // an override there always comes after. Laravel Zero runs no discovery, and the order is
+        // simply the list in config/app.php - where an AppServiceProvider commonly sits above the
+        // package. singleton() under the key would replace an override registered first;
+        // singletonIf() keeps it.
+        $override = new RecordingClient();
+        $app = $this->application(fn (): ClientInterface => $override, $overrideFirst, 'xenforo.http_client');
+
+        try {
+            // Faked, so a regression answers through the package's own adapter and fails on the
+            // assertion below, rather than reaching the network.
+            Http::fake(['forum.invalid/*' => Http::response(['user' => ['user_id' => 1]])]);
+
+            $app->make(XenForoManager::class)
+                ->build(['url' => 'https://forum.invalid', 'key' => 'key-under-test'])
+                ->users()->get(1);
+
+            $this->assertSame(
+                ['https://forum.invalid/api/users/1/'],
+                $override->sent,
+                "the application's override of xenforo.http_client was replaced",
+            );
+        } finally {
+            $this->tearDownFacades();
+        }
+    }
+
     /**
      * @param  Closure(Application): ClientInterface  $sibling  builds the sibling's client, given
      *                                                          the application it is registered in
+     * @param  string  $key  the container key the stub provider binds it under
      */
-    private function application(Closure $sibling, bool $siblingFirst): Application
+    private function application(Closure $sibling, bool $siblingFirst, string $key = ClientInterface::class): Application
     {
         $app = new Application(__DIR__ . '/..');
         $app->instance('config', new ConfigRepository());
@@ -148,15 +181,18 @@ final class SharedBindingTest extends BaseTestCase
 
         $client = $sibling($app);
 
-        $siblingProvider = new class ($app, $client) extends ServiceProvider {
-            public function __construct(Application $app, private readonly ClientInterface $client)
-            {
+        $siblingProvider = new class ($app, $client, $key) extends ServiceProvider {
+            public function __construct(
+                Application $app,
+                private readonly ClientInterface $client,
+                private readonly string $key,
+            ) {
                 parent::__construct($app);
             }
 
             public function register(): void
             {
-                $this->app->singleton(ClientInterface::class, fn (): ClientInterface => $this->client);
+                $this->app->singleton($this->key, fn (): ClientInterface => $this->client);
             }
         };
 
