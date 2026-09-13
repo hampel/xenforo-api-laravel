@@ -73,9 +73,19 @@ like clutter to be tidied away:
   endpoints need, since the 301 they answer with *is* their output. An earlier
   `follow_redirects` config key was removed once this was measured: it could never have
   done anything.
-- **Laravel's `RequestSending` / `ResponseReceived` events do not fire.** They are raised
-  in `PendingRequest::send()`, a layer above the handler stack. Telescope's HTTP client
-  watcher will not show this traffic; the core package's PSR-3 logging is what does.
+- **Of Laravel's three HTTP client events, only `RequestSending` fires.** `ResponseReceived`
+  and `ConnectionFailed` are dispatched from `PendingRequest::send()`, a layer above the
+  handler stack, so Telescope's HTTP client watcher will not show this traffic; the core
+  package's PSR-3 logging is what does. `RequestSending` comes from a callback
+  `PendingRequest`'s constructor registers, which `buildBeforeSendingHandler()` runs *inside*
+  the stack the adapter drives.
+
+  This documentation said neither fires until 2026-09-13, when a sibling wrapper's test
+  counted a `RequestSending` it did not expect. The Telescope conclusion was right and the
+  mechanism given for it was half wrong — plausible enough to be copied into the next
+  wrapper. `TransportTest::request_sending_fires_and_response_received_does_not` and
+  `a_connection_failure_raises_request_sending_and_nothing_to_match_it` now measure all three,
+  and pass on Laravel 12.61.1 and 13.31.0.
 - **`failOnDeprecation` is inert in a Testbench package without help, and the provider needs
   three probes, not two.** Laravel's `HandleExceptions` replaces PHPUnit's error handler when
   the application boots. `withoutDeprecationHandling()` in `setUp()` restores it for

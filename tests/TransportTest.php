@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 namespace Hampel\XenForo\Api\Laravel\Tests;
 
+use ArrayObject;
+use Hampel\XenForo\Api\Exception\RequestException;
 use Hampel\XenForo\Api\Laravel\Facades\XenForo;
+use Illuminate\Http\Client\Events\ConnectionFailed;
+use Illuminate\Http\Client\Events\RequestSending;
+use Illuminate\Http\Client\Events\ResponseReceived;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Client\ClientInterface;
@@ -77,5 +83,78 @@ final class TransportTest extends TestCase
         XenForo::users()->get(1);
 
         Http::assertSent(fn (Request $request): bool => $request->hasHeader('X-Application', 'under-test'));
+    }
+
+    #[Test]
+    public function request_sending_fires_and_response_received_does_not(): void
+    {
+        // Measured rather than reasoned, because the reasoning is easy to get half right - an
+        // earlier version of this package's documentation said neither fires. RequestSending
+        // is dispatched from a before-sending callback that PendingRequest's constructor
+        // registers, and buildBeforeSendingHandler() runs those callbacks INSIDE the handler
+        // stack this adapter drives, so it fires. ResponseReceived is dispatched from
+        // PendingRequest::send(), a layer above the stack, which the adapter never calls.
+        $events = $this->countHttpClientEvents();
+
+        Http::fake(['forum.example.com/*' => Http::response(['user' => ['user_id' => 1]])]);
+
+        XenForo::users()->get(1);
+
+        $this->assertSame(
+            [RequestSending::class => 1, ResponseReceived::class => 0, ConnectionFailed::class => 0],
+            $events->getArrayCopy(),
+        );
+    }
+
+    #[Test]
+    public function a_connection_failure_raises_request_sending_and_nothing_to_match_it(): void
+    {
+        // The case that makes the half-fired pair a hazard rather than a curiosity. The
+        // request is announced, the connection fails, and ConnectionFailed - dispatched from
+        // PendingRequest::send() like ResponseReceived - never follows. A listener pairing
+        // RequestSending with one of the other two sees a request that neither succeeded nor
+        // failed. The failure still reaches the caller: the core package maps Guzzle's
+        // ConnectException to its own RequestException.
+        $events = $this->countHttpClientEvents();
+
+        Http::fake(['forum.example.com/*' => Http::failedConnection()]);
+
+        try {
+            XenForo::users()->get(1);
+            $this->fail('Expected the connection failure to raise RequestException.');
+        } catch (RequestException) {
+            // expected
+        }
+
+        $this->assertSame(
+            [RequestSending::class => 1, ResponseReceived::class => 0, ConnectionFailed::class => 0],
+            $events->getArrayCopy(),
+        );
+    }
+
+    /**
+     * Listens for all three of Laravel's HTTP client events and counts them.
+     *
+     * An ArrayObject rather than an array because the listeners are closures: they need a
+     * handle on the counts, and an object is one without a by-reference capture.
+     *
+     * @return ArrayObject<class-string, int>
+     */
+    private function countHttpClientEvents(): ArrayObject
+    {
+        /** @var ArrayObject<class-string, int> $counts */
+        $counts = new ArrayObject([
+            RequestSending::class => 0,
+            ResponseReceived::class => 0,
+            ConnectionFailed::class => 0,
+        ]);
+
+        foreach (array_keys($counts->getArrayCopy()) as $event) {
+            Event::listen($event, function () use ($counts, $event): void {
+                $counts[$event] = (int) $counts[$event] + 1;
+            });
+        }
+
+        return $counts;
     }
 }

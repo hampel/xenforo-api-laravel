@@ -72,11 +72,16 @@ use Psr\Http\Message\ResponseInterface;
  * would arrive as a Guzzle exception, and the core package would report it as a transport
  * failure instead of mapping it to NotFoundException.
  *
- * WHAT IT DOES NOT DO: Laravel raises its RequestSending and ResponseReceived events from
- * PendingRequest::send(), which is a layer above the handler stack, so those events do not
- * fire and anything listening for them - Telescope's HTTP client watcher - will not show
- * this traffic. The package logs every request through PSR-3 instead, which under Laravel
- * reaches the application log.
+ * WHAT IT DOES NOT DO: raise ResponseReceived or ConnectionFailed. Laravel dispatches both
+ * from PendingRequest::send(), a layer above the handler stack, so anything listening for
+ * them - Telescope's HTTP client watcher among them - will not show this traffic. The package
+ * logs every request through PSR-3 instead, which under Laravel reaches the application log.
+ *
+ * RequestSending DOES fire, which is the half that is easy to get wrong. PendingRequest's
+ * constructor registers the callback that raises it, and buildBeforeSendingHandler() runs
+ * that callback inside the stack this class drives. So a listener pairing RequestSending
+ * with one of the other two sees every request announced and none of them concluded - a
+ * connection failure included.
  */
 final class PendingRequestClient implements ClientInterface
 {
