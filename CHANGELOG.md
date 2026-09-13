@@ -1,6 +1,18 @@
 CHANGELOG
 =========
 
+Unreleased
+----------
+
+* A client resolved before `Http::swap()` sends through the swapped-in factory, so its fakes and
+  `preventStrayRequests()` apply
+* `xenforo.timeout`, `xenforo.connect_timeout` and the transport options in `Http::globalOptions()`
+  reach the request: timeouts, TLS verification and client certificates, proxy, protocol
+  version, `force_ip_resolve`, `decode_content` and `curl`. Global `headers`, `query` and body
+  options are not applied
+* `PendingRequestClient`'s constructor accepts a `Closure` returning the `Factory`, as well as a
+  `Factory`
+
 1.1.0 (2026-09-14)
 ------------------
 
