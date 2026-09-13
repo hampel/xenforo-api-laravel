@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Hampel\XenForo\Api\Laravel\Tests;
 
 use ArrayObject;
+use Hampel\XenForo\Api\Client;
 use Hampel\XenForo\Api\Exception\RequestException;
 use Hampel\XenForo\Api\Laravel\Facades\XenForo;
+use Hampel\XenForo\Api\Laravel\XenForoManager;
 use Illuminate\Http\Client\Events\ConnectionFailed;
 use Illuminate\Http\Client\Events\RequestSending;
 use Illuminate\Http\Client\Events\ResponseReceived;
@@ -156,5 +158,99 @@ final class TransportTest extends TestCase
         }
 
         return $counts;
+    }
+
+    #[Test]
+    public function configured_timeouts_reach_the_request(): void
+    {
+        // xenforo.timeout and connect_timeout are set on Laravel's pending request, which only
+        // merges its options inside its own sendRequest() - a method this adapter does not
+        // call. So unless the adapter hands them to Guzzle itself, they are silently dropped
+        // and a stalled forum holds the request for as long as the operating system allows.
+        $config = $this->container()->make('config');
+        $config->set('xenforo.timeout', 7);
+        $config->set('xenforo.connect_timeout', 3);
+
+        $options = $this->captureRequestOptions();
+
+        $this->freshClient()->users()->get(1);
+
+        $this->assertSame(7.0, $options['timeout'] ?? null);
+        $this->assertSame(3.0, $options['connect_timeout'] ?? null);
+    }
+
+    #[Test]
+    public function global_transport_options_reach_the_request(): void
+    {
+        // The application's own Http::globalOptions() - a CA bundle, a proxy - is what an
+        // outbound HTTP policy is expressed in, and it has to apply to this traffic too.
+        Http::globalOptions([
+            'verify' => '/etc/ssl/certs/ca-under-test.pem',
+            'proxy' => 'http://proxy.invalid:3128',
+        ]);
+
+        $options = $this->captureRequestOptions();
+
+        $this->freshClient()->users()->get(1);
+
+        $this->assertSame('/etc/ssl/certs/ca-under-test.pem', $options['verify'] ?? null);
+        $this->assertSame('http://proxy.invalid:3128', $options['proxy'] ?? null);
+    }
+
+    #[Test]
+    public function global_headers_query_and_body_do_not_rewrite_the_request(): void
+    {
+        // The other side of the test above, and the reason global options pass through an
+        // allowlist rather than wholesale. The core package builds the request - its key, its
+        // Accept header, its query string and its body - and a global option must not replace
+        // any of them.
+        Http::globalOptions([
+            'headers' => ['XF-Api-Key' => 'hijacked', 'Accept' => 'text/html'],
+            'query' => ['injected' => '1'],
+            'form_params' => ['injected' => '1'],
+        ]);
+
+        Http::fake(['forum.invalid/*' => Http::response(['user' => ['user_id' => 1]])]);
+
+        $this->freshClient()->connection()->post('users/', ['username' => 'grace']);
+
+        Http::assertSent(fn (Request $request): bool => $request->hasHeader('XF-Api-Key', 'key-under-test')
+            && $request->header('Accept') === ['application/json']
+            && ! str_contains($request->url(), 'injected')
+            && $request['username'] === 'grace'
+            && ! isset($request['injected']));
+    }
+
+    /**
+     * Fakes every request, recording the Guzzle options it arrived with.
+     *
+     * @return ArrayObject<string, mixed>
+     */
+    private function captureRequestOptions(): ArrayObject
+    {
+        /** @var ArrayObject<string, mixed> $seen */
+        $seen = new ArrayObject();
+
+        Http::fake(function ($request, array $options) use ($seen) {
+            foreach ($options as $key => $value) {
+                $seen[$key] = $value;
+            }
+
+            return Http::response(['user' => ['user_id' => 1]]);
+        });
+
+        return $seen;
+    }
+
+    /**
+     * A client built after this test's configuration, rather than the one setUp resolved.
+     */
+    private function freshClient(): Client
+    {
+        $this->container()->forgetInstance(ClientInterface::class);
+        $this->container()->forgetInstance(XenForoManager::class);
+
+        return $this->container()->make(XenForoManager::class)
+            ->build(['url' => 'https://forum.invalid', 'key' => 'key-under-test']);
     }
 }

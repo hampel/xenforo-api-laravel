@@ -149,8 +149,11 @@ $client->users()->get(1);
 'connect_timeout' => 5,
 ```
 
-Applied to every request, alongside any `Http::globalOptions()` and
-`Http::globalRequestMiddleware()` the application has configured.
+Applied to every request, alongside any `Http::globalRequestMiddleware()` the application has
+configured. `Http::globalOptions()` applies too, but only its transport options: timeouts, TLS
+verification and client certificates, proxy, protocol version and curl settings. Global
+`headers`, `query` and body options are ignored, because the request is built by the core
+package and they would overwrite its API key, its query string or its body.
 
 Redirects are not followed — Guzzle's PSR-18 entry point does not follow them, so a 3xx is
 handed back whole. That is what the two attachment thumbnail endpoints need, since the 301

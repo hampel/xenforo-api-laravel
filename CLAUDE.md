@@ -36,7 +36,7 @@ reason to exist.
 
 ## The adapter, and why it looks the way it does
 
-Three decisions in `PendingRequestClient` are load-bearing and each has a way of looking
+Five decisions in `PendingRequestClient` are load-bearing and each has a way of looking
 like clutter to be tidied away:
 
 - **The pending request is rebuilt on every send.** `Factory::fake()` *replaces* the
@@ -44,6 +44,13 @@ like clutter to be tidied away:
   is called — so a client built once and kept holds a snapshot, and a fake registered after
   it was built never applies. `HttpFakeTest::faking_after_the_client_was_resolved_still_intercepts`
   is the test.
+- **The factory is resolved on every send, too.** The constructor takes a resolver, not a
+  `Factory`, because `Http::swap()` binds a *new* factory — the usual way for a suite to start
+  from clean fakes, since `fake()` merges. A client holding the factory it was built with sends
+  past the new fakes and past the new `preventStrayRequests()`: a real request carrying the
+  configured key. A `Factory` passed directly is still accepted, for a client built by hand, and
+  held as given. The swap tests in `HttpFakeTest` point at `forum.invalid`, so a regression fails
+  to resolve rather than reaching a forum.
 - **One Guzzle handler is shared across those rebuilds.** The handler owns curl's
   connection pool, so keep-alive survives even though the stack around it is new each time.
   Without it, an API client paging through results pays a fresh TLS handshake per page.
@@ -58,6 +65,24 @@ like clutter to be tidied away:
 
   Only the Laravel 12 CI job catches a regression here. On 13 the suite passes without any
   of it.
+- **Transport options are passed by hand, through an allowlist.** `PendingRequest` merges its
+  options — the configured timeouts and everything from `Http::globalOptions()` — only inside
+  `sendRequest()`, which the adapter does not call, so `transportOptions()` hands the transport
+  half to `send()` itself. **Never wholesale:** a global `headers`, `query` or `form_params`
+  entry would overwrite the core package's API key, query string or body. Each key is copied
+  only when its value has the type Guzzle declares, and **one key at a time rather than in a
+  loop** — Guzzle 8 declares `send()`'s options as an array shape, and PHPStan 2.1.22, which the
+  `--prefer-lowest` corner resolves, widens a loop-built array and rejects the return.
+
+  `TransportTest` has a test per direction: configured timeouts arrive, a global CA bundle and
+  proxy arrive, and a global header, query and body do not. Probed both ways — passing nothing
+  fails the first two, passing everything fails the third.
+
+  **Both defects were silent from the first release until 2026-09-14,** found in a sibling
+  wrapper whose adapter was the same file. Measured here before fixing: a configured `timeout`
+  reached Guzzle as `null` and a global CA bundle as Guzzle's default `true`, and a client
+  resolved before `Http::swap()` sent a real request that failed only because its host was
+  `.invalid`. The README had said `Http::globalOptions()` applied.
 
 ## Facts worth not rediscovering
 
