@@ -76,13 +76,28 @@ like clutter to be tidied away:
 - **Laravel's `RequestSending` / `ResponseReceived` events do not fire.** They are raised
   in `PendingRequest::send()`, a layer above the handler stack. Telescope's HTTP client
   watcher will not show this traffic; the core package's PSR-3 logging is what does.
-- **`failOnDeprecation` is inert in a Testbench package without help.** Laravel's
-  `HandleExceptions` replaces PHPUnit's error handler when the application boots.
-  `withoutDeprecationHandling()` in `setUp()` fixes it for test-executed paths — but the
-  provider's own `register()` has already run inside `parent::setUp()`, so
-  `ConfigurationTest::registering_the_provider_binds_the_manager_and_merges_the_config`
-  registers it again against an application built in the test body. Both paths were probed
-  with `trigger_error(..., E_USER_DEPRECATED)`; both exit non-zero.
+- **`failOnDeprecation` is inert in a Testbench package without help, and the provider needs
+  three probes, not two.** Laravel's `HandleExceptions` replaces PHPUnit's error handler when
+  the application boots. `withoutDeprecationHandling()` in `setUp()` restores it for
+  test-executed paths — but Testbench boots the application inside `parent::setUp()`, before
+  that line runs, so the provider's `register()` **and** `boot()` have both already run under
+  the swallowing handler. Each is covered separately, against an application built in the test
+  body: `registering_the_provider_binds_the_manager_and_merges_the_config` for `register()`,
+  `booting_the_provider_registers_the_config_to_publish` for `boot()`.
+
+  **Covering one does not cover the other.** `register()` holds the bindings, but `boot()`
+  still calls framework API — `runningInConsole()`, `publishes()`, `configPath()` — on a
+  package that claims two Laravel majors. On 2026-09-13 a deprecation planted in `boot()`
+  exited 0 and printed `OK (56 tests)`, after an audit had recorded the flag as verified: it
+  probed `register()` and a test path, which is what the checklist then asked for. Probed
+  since, all three exit 2.
+
+  The `boot()` test touches static state. `ServiceProvider::$publishes` and `$publishGroups`
+  are static and Testbench has already filled them, so the test snapshots both and restores
+  them in a `finally` — without that, it overwrites the destination another test asserts on
+  and the pair fails or passes by execution order. It also empties them before booting: the
+  entry Testbench registered names the same source path, so against the filled statics the
+  assertion cannot tell whose registration it sees.
 - **Laravel Zero does not bind the HTTP client factory, and Testbench cannot see that.**
   Laravel binds `Illuminate\Http\Client\Factory` as a singleton in
   `FoundationServiceProvider`; Laravel Zero's provider set is Build, Cache, Collision,
@@ -100,7 +115,7 @@ like clutter to be tidied away:
 - **`composer-require-checker` carries the undeclared-dependency check here, not the
   dev-free PHPStan job.** `laravel/framework` `replace`s every `illuminate/*` component, so
   the framework supplies every `Illuminate` symbol whether its component was declared or
-  not. The four whitelisted symbols are that same `replace` — there is no
+  not. The five whitelisted symbols are that same `replace` — there is no
   `vendor/illuminate/` for the checker to attribute them to. A *new* `Illuminate` symbol
   appearing there is a prompt to check `require`, not to extend the list.
 
