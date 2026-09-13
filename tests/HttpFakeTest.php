@@ -4,9 +4,15 @@ declare(strict_types=1);
 
 namespace Hampel\XenForo\Api\Laravel\Tests;
 
+use GuzzleHttp\Psr7\HttpFactory as Psr17Factory;
+use Hampel\XenForo\Api\Authentication\ApiKey;
+use Hampel\XenForo\Api\Client;
+use Hampel\XenForo\Api\Config;
 use Hampel\XenForo\Api\Exception\NotFoundException;
 use Hampel\XenForo\Api\Generated\Schema\User;
 use Hampel\XenForo\Api\Laravel\Facades\XenForo;
+use Hampel\XenForo\Api\Laravel\Http\PendingRequestClient;
+use Illuminate\Http\Client\Factory as HttpClientFactory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\Client\StrayRequestException;
 use Illuminate\Support\Facades\Http;
@@ -160,5 +166,63 @@ final class HttpFakeTest extends TestCase
 
         $this->assertSame('barbara', $client->users()->get(5)->username);
         Http::assertSent(fn (Request $request): bool => $request->hasHeader('XF-Api-Key', 'built-key'));
+    }
+
+    #[Test]
+    public function a_factory_swapped_in_after_the_client_was_resolved_is_consulted(): void
+    {
+        // Http::fake() merges into the factory it finds, so a suite that wants a clean slate
+        // swaps in a new one - and Facade::swap() binds that new instance into the container.
+        // A client resolved beforehand must send through it, not through the factory it was
+        // built with. The host is reserved (.invalid), so a regression fails to resolve rather
+        // than sending a request anywhere.
+        $client = XenForo::build(['url' => 'https://forum.invalid', 'key' => 'key-under-test']);
+
+        Http::swap(new HttpClientFactory());
+        Http::fake([
+            'forum.invalid/*' => Http::response(['user' => ['user_id' => 3, 'username' => 'ada']]),
+        ]);
+
+        $this->assertSame('ada', $client->users()->get(3)->username);
+    }
+
+    #[Test]
+    public function a_swapped_factorys_stray_request_guard_applies(): void
+    {
+        // The dangerous half: without it, the new factory's preventStrayRequests() is never
+        // consulted, and a test that believes it has forbidden the network sends a real request
+        // carrying the configured key.
+        $client = XenForo::build(['url' => 'https://forum.invalid', 'key' => 'key-under-test']);
+
+        Http::swap(new HttpClientFactory());
+        Http::preventStrayRequests();
+
+        $this->expectException(StrayRequestException::class);
+
+        $client->users()->get(3);
+    }
+
+    #[Test]
+    public function a_client_built_by_hand_with_a_factory_sends_through_that_factory(): void
+    {
+        // The constructor's compatibility arm. The provider passes a resolver, but a Factory
+        // passed directly is held as given - the caller's choice - and must still work, or
+        // accepting it would be an untested promise.
+        $factory = new HttpClientFactory();
+        $factory->fake([
+            'forum.invalid/*' => HttpClientFactory::response(['user' => ['user_id' => 1, 'username' => 'ada']]),
+        ]);
+
+        $psr17 = new Psr17Factory();
+        $client = new Client(
+            new Config('https://forum.invalid'),
+            new ApiKey('key-under-test'),
+            new PendingRequestClient($factory, 10.0, 5.0),
+            $psr17,
+            $psr17,
+        );
+
+        $this->assertSame('ada', $client->users()->get(1)->username);
+        $factory->assertSentCount(1);
     }
 }

@@ -287,9 +287,9 @@ Three things worth knowing:
   package treats as a malformed response rather than an empty result — a 2xx that does not
   decode is a maintenance page, a WAF challenge or a truncated body, and reading it as
   "no such record" is the failure the package exists to prevent. Always give a body.
-- **Order does not matter.** Faking after the client has been resolved works, because the
-  transport resolves Laravel's HTTP factory at the moment of sending rather than when it
-  was built.
+- **Order does not matter.** Faking after the client has been resolved works, and so does
+  `Http::swap()` with a new factory, because the transport resolves Laravel's HTTP factory at
+  the moment of sending rather than when it was built.
 - **Request bodies are assertable** — `$request['username']` works, because the core
   package writes form-encoded bodies with an exact `Content-Type`.
 

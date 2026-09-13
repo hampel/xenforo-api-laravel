@@ -58,10 +58,12 @@ final class XenForoServiceProvider extends ServiceProvider
         $this->app->singleton(ClientInterface::class, function (): ClientInterface {
             $config = $this->app->make(Config::class);
 
-            // The same Factory instance the Http facade resolves, which is what puts this
-            // package's requests among the ones Http::fake() and Http::assertSent() see.
+            // A resolver rather than the factory itself: looked up on every send, so it is
+            // always the instance the Http facade resolves - including one bound later by
+            // Http::swap(). That is what puts this package's requests among the ones
+            // Http::fake() and Http::assertSent() see.
             return new PendingRequestClient(
-                $this->app->make(HttpClientFactory::class),
+                fn (): HttpClientFactory => $this->app->make(HttpClientFactory::class),
                 $this->seconds($config->get('xenforo.timeout'), 10.0),
                 $this->seconds($config->get('xenforo.connect_timeout'), 5.0),
             );

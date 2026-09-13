@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hampel\XenForo\Api\Laravel\Http;
 
+use Closure;
 use GuzzleHttp\RequestOptions;
 use GuzzleHttp\TransferStats;
 use GuzzleHttp\Utils;
@@ -39,6 +40,13 @@ use Psr\Http\Message\ResponseInterface;
  * request would go to the real forum. Rebuilding here means the stubs, the stray-request
  * setting, `Http::globalOptions()` and `Http::globalRequestMiddleware()` are all read at
  * the moment of sending, so ordering stops mattering.
+ *
+ * THE FACTORY IS RESOLVED PER REQUEST TOO, for the same reason one level up. Http::swap()
+ * binds a NEW factory into the container - the usual way for a test suite to start from a
+ * clean set of fakes, since fake() merges. Holding the factory this client was built with
+ * would send past the new fakes and past the new factory's preventStrayRequests(), which is a
+ * real request carrying the configured key. So the constructor takes a resolver. A Factory
+ * passed directly is held as given, which is the caller's choice for a client built by hand.
  *
  * The Guzzle handler underneath is built once and reused, which is what stops that costing
  * anything: the handler owns curl's connection pool, so keep-alive survives between
@@ -95,21 +103,34 @@ final class PendingRequestClient implements ClientInterface
      */
     private $handler = null;
 
+    /**
+     * @var Closure(): Factory
+     */
+    private readonly Closure $factory;
+
+    /**
+     * @param  Factory|(Closure(): Factory)  $factory  a resolver, so the factory is looked up
+     *                                               on every send. A Factory is accepted for a
+     *                                               client built by hand, and is held as given
+     */
     public function __construct(
-        private readonly Factory $factory,
+        Factory|Closure $factory,
         private readonly float $timeout,
         private readonly float $connectTimeout,
     ) {
+        $this->factory = $factory instanceof Factory ? static fn (): Factory => $factory : $factory;
     }
 
     public function sendRequest(RequestInterface $request): ResponseInterface
     {
-        $this->handler ??= Utils::chooseHandler();
+        // Into a local: calling the resolver below would otherwise lose PHPStan's non-null
+        // narrowing of the property.
+        $handler = $this->handler ??= Utils::chooseHandler();
 
-        return $this->factory->createPendingRequest()
+        return ($this->factory)()->createPendingRequest()
             ->timeout($this->timeout)
             ->connectTimeout($this->connectTimeout)
-            ->setHandler($this->handler)
+            ->setHandler($handler)
             ->buildClient()
             ->send($request, [
                 RequestOptions::SYNCHRONOUS => true,
