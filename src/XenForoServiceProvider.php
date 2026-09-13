@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hampel\XenForo\Api\Laravel;
 
 use GuzzleHttp\Psr7\HttpFactory as Psr17Factory;
+use Hampel\XenForo\Api\Laravel\Exception\InvalidConfiguration;
 use Hampel\XenForo\Api\Laravel\Http\PendingRequestClient;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Events\Dispatcher;
@@ -19,13 +20,27 @@ use Psr\Log\LoggerInterface;
 /**
  * Wires the XenForo API manager into the container.
  *
- * ClientInterface is bound separately, and by interface, because it is the package's
- * extension point: rebind or decorate it and every forum's client picks the replacement up.
- * The default sends through Laravel's HTTP client, which is what makes the package's
- * traffic visible to Http::fake() - see PendingRequestClient.
+ * The transport is bound under this package's own key, xenforo.http_client, and the manager is
+ * built from that key alone. It is the extension point: rebind or decorate it and every forum's
+ * client picks the replacement up. The default sends through Laravel's HTTP client, which is
+ * what makes the package's traffic visible to Http::fake() - see PendingRequestClient.
+ *
+ * NOT Psr\Http\Client\ClientInterface, which is one key shared by every package that binds it.
+ * Each Laravel API wrapper once bound its adapter there, and singleton() on a bound key replaces
+ * it, so with two installed the last provider registered supplied its adapter and timeouts to
+ * both, and took the other's binding over. Nor does the manager fall back to a ClientInterface
+ * binding when one exists: an older sibling or an unrelated library may have bound it, and
+ * picking that up silently would bring the collision back and put the traffic outside
+ * Http::fake().
  */
 final class XenForoServiceProvider extends ServiceProvider
 {
+    /**
+     * The container key the transport is bound under, and the one an application rebinds to
+     * replace it.
+     */
+    public const HTTP_CLIENT = 'xenforo.http_client';
+
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/xenforo.php', 'xenforo');
@@ -55,7 +70,7 @@ final class XenForoServiceProvider extends ServiceProvider
         $this->app->bindIf(RequestFactoryInterface::class, static fn (): RequestFactoryInterface => new Psr17Factory());
         $this->app->bindIf(StreamFactoryInterface::class, static fn (): StreamFactoryInterface => new Psr17Factory());
 
-        $this->app->singleton(ClientInterface::class, function (): ClientInterface {
+        $this->app->singleton(self::HTTP_CLIENT, function (): ClientInterface {
             $config = $this->app->make(Config::class);
 
             // A resolver rather than the factory itself: looked up on every send, so it is
@@ -72,7 +87,7 @@ final class XenForoServiceProvider extends ServiceProvider
         $this->app->singleton(XenForoManager::class, function (): XenForoManager {
             return new XenForoManager(
                 $this->app->make(Config::class),
-                $this->app->make(ClientInterface::class),
+                $this->httpClient(),
                 $this->app->make(RequestFactoryInterface::class),
                 $this->app->make(StreamFactoryInterface::class),
                 $this->app->make(LoggerInterface::class),
@@ -92,6 +107,22 @@ final class XenForoServiceProvider extends ServiceProvider
                 __DIR__ . '/../config/xenforo.php' => $this->app->configPath('xenforo.php'),
             ], 'xenforo-config');
         }
+    }
+
+    /**
+     * The transport, from this package's key, checked rather than trusted: an application may
+     * rebind the key, and a wrong type should name the key rather than surface as a TypeError in
+     * the manager's constructor.
+     */
+    private function httpClient(): ClientInterface
+    {
+        $client = $this->app->make(self::HTTP_CLIENT);
+
+        if (! $client instanceof ClientInterface) {
+            throw InvalidConfiguration::httpClientNotPsr18(self::HTTP_CLIENT, get_debug_type($client));
+        }
+
+        return $client;
     }
 
     private function seconds(mixed $value, float $default): float

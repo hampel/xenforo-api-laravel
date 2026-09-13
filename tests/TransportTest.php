@@ -24,10 +24,10 @@ final class TransportTest extends TestCase
     #[Test]
     public function a_replacement_transport_is_used_by_every_forum(): void
     {
-        // The reason ClientInterface is bound by interface rather than constructed inside
-        // the manager: an application with its own outbound HTTP policy - a proxy-aware,
-        // SSRF-guarded client everything is required to go through - binds it here and this
-        // package uses it, instead of the application writing a second API client.
+        // The reason the transport is bound under a key rather than constructed inside the
+        // manager: an application with its own outbound HTTP policy - a proxy-aware,
+        // SSRF-guarded client everything is required to go through - rebinds xenforo.http_client
+        // and this package uses it, instead of the application writing a second API client.
         $recorder = new class () implements ClientInterface {
             /** @var list<string> */
             public array $sent = [];
@@ -40,7 +40,7 @@ final class TransportTest extends TestCase
             }
         };
 
-        $this->container()->instance(ClientInterface::class, $recorder);
+        $this->container()->instance('xenforo.http_client', $recorder);
 
         XenForo::users()->get(1);
         XenForo::forum('second')->users()->get(2);
@@ -247,7 +247,7 @@ final class TransportTest extends TestCase
      */
     private function freshClient(): Client
     {
-        $this->container()->forgetInstance(ClientInterface::class);
+        $this->container()->forgetInstance('xenforo.http_client');
         $this->container()->forgetInstance(XenForoManager::class);
 
         return $this->container()->make(XenForoManager::class)

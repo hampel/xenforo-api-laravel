@@ -178,11 +178,14 @@ final class ReadmeExamplesTest extends TestCase
 
         $config = new Config('https://elsewhere.example.com');
         $credential = new ApiKey('direct-key');
+        $transport = app('xenforo.http_client');
+
+        $this->assertInstanceOf(ClientInterface::class, $transport);
 
         $client = new Client(
             $config,
             $credential,
-            app(ClientInterface::class),
+            $transport,
             app(RequestFactoryInterface::class),
             app(StreamFactoryInterface::class),
         );

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hampel\XenForo\Api\Laravel\Tests;
 
+use Hampel\XenForo\Api\Laravel\Exception\InvalidConfiguration;
 use Hampel\XenForo\Api\Laravel\Http\PendingRequestClient;
 use Hampel\XenForo\Api\Laravel\XenForoManager;
 use Hampel\XenForo\Api\Laravel\XenForoServiceProvider;
@@ -61,9 +62,27 @@ final class ConfigurationTest extends TestCase
     }
 
     #[Test]
-    public function the_transport_is_bound_by_interface_so_it_can_be_replaced(): void
+    public function the_transport_is_bound_under_the_packages_own_key(): void
     {
-        $this->assertInstanceOf(PendingRequestClient::class, $this->container()->make(ClientInterface::class));
+        // Not under Psr\Http\Client\ClientInterface, which every package that binds it shares -
+        // see SharedBindingTest for what that did with two wrappers installed.
+        $this->assertInstanceOf(PendingRequestClient::class, $this->container()->make('xenforo.http_client'));
+        $this->assertFalse($this->container()->bound(ClientInterface::class));
+    }
+
+    #[Test]
+    public function a_transport_rebound_to_something_that_is_not_psr18_is_named(): void
+    {
+        // The key is the documented override point, so a wrong binding is an application's
+        // mistake to diagnose. It names the key rather than surfacing as a TypeError in the
+        // manager's constructor.
+        $this->container()->instance('xenforo.http_client', new \stdClass());
+        $this->container()->forgetInstance(XenForoManager::class);
+
+        $this->expectException(InvalidConfiguration::class);
+        $this->expectExceptionMessage('"xenforo.http_client" must resolve to a Psr\Http\Client\ClientInterface; it resolved to stdClass');
+
+        $this->container()->make(XenForoManager::class);
     }
 
     #[Test]
@@ -95,7 +114,8 @@ final class ConfigurationTest extends TestCase
         (new XenForoServiceProvider($app))->register();
 
         $this->assertTrue($app->bound(XenForoManager::class));
-        $this->assertTrue($app->bound(ClientInterface::class));
+        $this->assertTrue($app->bound('xenforo.http_client'));
+        $this->assertFalse($app->bound(ClientInterface::class));
         $this->assertTrue($app->bound(RequestFactoryInterface::class));
         $this->assertTrue($app->bound(StreamFactoryInterface::class));
         $this->assertSame('main', $app->make(Config::class)->get('xenforo.default'));

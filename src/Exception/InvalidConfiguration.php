@@ -7,8 +7,8 @@ namespace Hampel\XenForo\Api\Laravel\Exception;
 use Hampel\XenForo\Api\Exception\XenForoException;
 
 /**
- * A forum's settings cannot be turned into a client, whether they came from the configuration
- * or were passed to XenForoManager::build().
+ * The configuration cannot be turned into a client: a forum's settings, from the configuration or
+ * passed to XenForoManager::build(), or the transport bound under the package's container key.
  *
  * Raised rather than letting a half-configured forum through, because both cases it covers
  * fail somewhere far less obvious. A missing URL reaches the core package as an empty base
@@ -45,6 +45,15 @@ final class InvalidConfiguration extends XenForoException
             $forum === null
                 ? 'The XenForo forum settings passed to XenForoManager::build()'
                 : sprintf('XenForo forum "%s"', $forum)
+        ));
+    }
+
+    public static function httpClientNotPsr18(string $key, string $given): self
+    {
+        return new self(sprintf(
+            'The container key "%s" must resolve to a Psr\\Http\\Client\\ClientInterface; it resolved to %s.',
+            $key,
+            $given
         ));
     }
 }

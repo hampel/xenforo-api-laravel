@@ -211,19 +211,18 @@ and choice of credential. The client sends through the same transport, so `Http:
 `Http::preventStrayRequests()` reach it. Each call builds a new client and nothing is memoised,
 so keep the one you get.
 
-The transport is bound as `Psr\Http\Client\ClientInterface`, with PSR-17 factories beside it,
-for constructing a `Hampel\XenForo\Api\Client` directly:
+The transport is bound under the container key `xenforo.http_client`, with PSR-17 factories
+beside it, for constructing a `Hampel\XenForo\Api\Client` directly:
 
 ```php
 use Hampel\XenForo\Api\Client;
-use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 
 $client = new Client(
     $config,
     $credential,
-    app(ClientInterface::class),
+    app('xenforo.http_client'),
     app(RequestFactoryInterface::class),
     app(StreamFactoryInterface::class),
 );
@@ -296,9 +295,21 @@ Three things worth knowing:
 - **Request bodies are assertable** — `$request['username']` works, because the core
   package writes form-encoded bodies with an exact `Content-Type`.
 
-Replace the transport entirely by binding `Psr\Http\Client\ClientInterface`, which is how
-an application with its own outbound HTTP policy — a proxy-aware or SSRF-guarded client
-that everything is required to go through — makes this package use it.
+Replace the transport entirely by rebinding `xenforo.http_client` to any PSR-18 client. That is
+how an application with its own outbound HTTP policy, such as a proxy-aware or SSRF-guarded client
+that everything must go through, makes this package use it:
+
+```php
+$this->app->singleton('xenforo.http_client', fn () => $policyClient);
+```
+
+Proxy and CA settings don't need a replacement: set them with `Http::globalOptions()`, which
+reaches this package's requests and keeps them visible to `Http::fake()`.
+
+**Binding `Psr\Http\Client\ClientInterface` does not affect this package.** That key is shared
+by every package that binds it, so with two of them installed the last one registered would serve
+both. The package neither binds that key nor falls back to it. An application that wants all of
+its API traffic through its own client rebinds each package's own key.
 
 ### What is not visible
 

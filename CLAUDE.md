@@ -86,6 +86,25 @@ like clutter to be tidied away:
 
 ## Facts worth not rediscovering
 
+- **The transport is bound under `xenforo.http_client`, never under
+  `Psr\Http\Client\ClientInterface`, and the manager never falls back to the shared key.** The
+  shared key is claimed by every package that binds it. When each Laravel API wrapper bound its
+  adapter there, `singleton()` on the bound key meant the last provider registered supplied its
+  adapter and timeouts to every manager, and took the others' bindings over. A fallback would bring
+  that back: an older sibling or an unrelated library can still bind the shared key, and picking
+  it up silently would also put the traffic outside `Http::fake()`.
+
+  **It is a convention shared by the four Laravel API wrappers**, so an application meets one
+  override style: each binds `<config key>.http_client`. The PSR-17 `bindIf()` calls and the
+  `singletonIf()` for Laravel's HTTP factory stay as they are — stateless or deliberately shared.
+
+  Found on 2026-09-14 in an application with three wrappers installed, where every manager sent
+  through the last-registered wrapper's adapter. Two of them had been configured with a 2s
+  timeout and were still waiting when killed at 15s. No package's own suite could see it, since
+  each installs one package. `SharedBindingTest` registers a stub provider binding the shared key
+  before and after this one. The manager must keep its own adapter and timeout, and the stub's
+  binding must survive. Both orders failed against the old provider.
+
 - **The core package's `Content-Type` exactness is what makes request bodies assertable.**
   `Illuminate\Http\Client\Request::isForm()` matches
   `application/x-www-form-urlencoded` *exactly*, and gates `data()`, which backs
