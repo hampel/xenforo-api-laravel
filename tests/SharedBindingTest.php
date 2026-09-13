@@ -57,6 +57,7 @@ final class SharedBindingTest extends BaseTestCase
         $app = $this->application(fn (): ClientInterface => $recorder, $siblingFirst);
 
         try {
+            /** @var ArrayObject<string, mixed> $options */
             $options = new ArrayObject();
 
             Http::fake(function ($request, array $received) use ($options) {
@@ -112,6 +113,7 @@ final class SharedBindingTest extends BaseTestCase
         );
 
         try {
+            /** @var ArrayObject<string, mixed> $options */
             $options = new ArrayObject();
 
             Http::fake(function ($request, array $received) use ($options) {

@@ -6,11 +6,18 @@ forums, and a facade — and one adapter that is the reason the package exists.
 ## Commands
 
 ```bash
-composer check          # lint, analyse, test - what CI runs
+composer check          # lint, analyse, test - CI's commands, against your composer.lock
 composer test           # phpunit
 composer analyse        # phpstan, level 10 with larastan, PHP 8.3-8.5 in one pass
 composer format         # pint
 ```
+
+**A green `composer check` is not a green CI run.** CI's newest-corner jobs run `composer update`,
+so they resolve whatever PHPStan, Larastan and Pint are current that day, and the lockfile is not
+committed. A tool release can fail CI with nothing changed here. Before tagging, run
+`composer update` first, so the check runs against what CI will resolve. On 2026-09-14 PHPStan
+2.2.14 and Larastan 3.12.1 appeared between the local check and the push, and the 1.2.0 release
+went red on both Laravel 13 jobs while `composer check` was clean.
 
 ## Layout
 
