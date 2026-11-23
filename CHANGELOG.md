@@ -1,63 +1,58 @@
-CHANGELOG
-=========
+# CHANGELOG
 
-1.2.0 (2026-09-14)
-------------------
+## 1.2.0 (2026-09-14)
 
-* **Breaking:** the transport is bound under the container key `xenforo.http_client` instead of
+- **Breaking:** the transport is bound under the container key `xenforo.http_client` instead of
   `Psr\Http\Client\ClientInterface`. Rebind `xenforo.http_client` from any service provider to
   replace it; binding `ClientInterface` no longer affects this package
-* `xenforo.http_client` is bound only when nothing has bound it already, so an application's
+- `xenforo.http_client` is bound only when nothing has bound it already, so an application's
   override is kept in either provider order
-* The service provider no longer binds `Psr\Http\Client\ClientInterface`
-* `InvalidConfiguration::httpClientNotPsr18()` is raised when `xenforo.http_client` does not resolve
+- The service provider no longer binds `Psr\Http\Client\ClientInterface`
+- `InvalidConfiguration::httpClientNotPsr18()` is raised when `xenforo.http_client` does not resolve
   to a PSR-18 client
 
-1.1.1 (2026-09-14)
-------------------
+## 1.1.1 (2026-09-14)
 
-* A client resolved before `Http::swap()` sends through the swapped-in factory, so its fakes and
+- A client resolved before `Http::swap()` sends through the swapped-in factory, so its fakes and
   `preventStrayRequests()` apply
-* `xenforo.timeout`, `xenforo.connect_timeout` and the transport options in `Http::globalOptions()`
+- `xenforo.timeout`, `xenforo.connect_timeout` and the transport options in `Http::globalOptions()`
   reach the request: timeouts, TLS verification and client certificates, proxy, protocol
   version, `force_ip_resolve`, `decode_content` and `curl`. Global `headers`, `query` and body
   options are not applied
-* `PendingRequestClient`'s constructor accepts a `Closure` returning the `Factory`, as well as a
+- `PendingRequestClient`'s constructor accepts a `Closure` returning the `Factory`, as well as a
   `Factory`
 
-1.1.0 (2026-09-14)
-------------------
+## 1.1.0 (2026-09-14)
 
-* `XenForoManager::build()` makes a client from an array of settings, for a forum that is not
+- `XenForoManager::build()` makes a client from an array of settings, for a forum that is not
   in `config/xenforo.php`. It takes the same keys as an entry under `xenforo.forums`, applies
   the same validation and credential selection, sends through the same transport, and is not
   memoised
-* `InvalidConfiguration::missingUrl()` and `actingUserWithoutKey()` accept `null` for settings
+- `InvalidConfiguration::missingUrl()` and `actingUserWithoutKey()` accept `null` for settings
   passed to `build()`
-* README: Laravel Zero does not discover packages, so the provider must be listed in
+- README: Laravel Zero does not discover packages, so the provider must be listed in
   `config/app.php` and the facade imported by class name
-* README and `PendingRequestClient` docblock: `RequestSending` fires for requests the API
+- README and `PendingRequestClient` docblock: `RequestSending` fires for requests the API
   client makes; `ResponseReceived` and `ConnectionFailed` do not
 
-1.0.0 (2026-09-09)
-------------------
+## 1.0.0 (2026-09-09)
 
-* Initial release
-* `XenForoServiceProvider` binds `XenForoManager`, merges `config/xenforo.php` and
+- Initial release
+- `XenForoServiceProvider` binds `XenForoManager`, merges `config/xenforo.php` and
   publishes it under the `xenforo-config` tag
-* `XenForoManager` builds one `Hampel\XenForo\Api\Client` per configured forum, memoised by
+- `XenForoManager` builds one `Hampel\XenForo\Api\Client` per configured forum, memoised by
   name; a call naming no forum is forwarded to the default
-* `XenForo` facade, with a `@method` annotation for each accessor on `Client`
-* `Http::fake()`, `Http::assertSent()` and `Http::preventStrayRequests()` apply to requests
+- `XenForo` facade, with a `@method` annotation for each accessor on `Client`
+- `Http::fake()`, `Http::assertSent()` and `Http::preventStrayRequests()` apply to requests
   the API client makes. Request building, status mapping and the exception hierarchy are
   the core package's throughout, and its exceptions reach the caller unchanged
-* `Illuminate\Http\Client\Factory` is bound as a singleton when the application has not
+- `Illuminate\Http\Client\Factory` is bound as a singleton when the application has not
   bound one, as a Laravel Zero application does not
-* `Psr\Http\Client\ClientInterface` is bound separately: rebind it to route the package's
+- `Psr\Http\Client\ClientInterface` is bound separately: rebind it to route the package's
   requests through an application's own HTTP client
-* Credentials are read from configuration as `ApiKey`, `SuperUserKey`, `BearerToken` or
+- Credentials are read from configuration as `ApiKey`, `SuperUserKey`, `BearerToken` or
   `Guest`
-* `UnknownForum` and `InvalidConfiguration` extend the core package's `XenForoException`.
+- `UnknownForum` and `InvalidConfiguration` extend the core package's `XenForoException`.
   A forum with no `url`, and an acting user with no key beside it, are refused when the
   client is built
-* Requires `hampel/xenforo-api` `^1.1`, PHP 8.3, and Laravel 12 or 13
+- Requires `hampel/xenforo-api` `^1.1`, PHP 8.3, and Laravel 12 or 13
