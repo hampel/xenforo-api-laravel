@@ -29,7 +29,7 @@ use Psr\Log\LoggerInterface;
  * Each Laravel API wrapper once bound its adapter there, and singleton() on a bound key replaces
  * it, so with two installed the last provider registered supplied its adapter and timeouts to
  * both, and took the other's binding over. Nor does the manager fall back to a ClientInterface
- * binding when one exists: an older sibling or an unrelated library may have bound it, and
+ * binding when one exists: an older release of another wrapper or an unrelated library may have bound it, and
  * picking that up silently would bring the collision back and put the traffic outside
  * Http::fake().
  */

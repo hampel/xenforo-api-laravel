@@ -120,11 +120,11 @@ like clutter to be tidied away:
   proxy arrive, and a global header, query and body do not. Probed both ways — passing nothing
   fails the first two, passing everything fails the third.
 
-  **Both defects were silent from the first release until 2026-09-14,** found in a sibling
-  wrapper whose adapter was the same file. Measured here before fixing: a configured `timeout`
-  reached Guzzle as `null` and a global CA bundle as Guzzle's default `true`, and a client
-  resolved before `Http::swap()` sent a real request that failed only because its host was
-  `.invalid`. The README had said `Http::globalOptions()` applied.
+  **Both defects were silent from the first release until 2026-09-14,** found in
+  `hampel/binarylane-api-laravel`, whose adapter was the same file. Measured here before fixing: a
+  configured `timeout` reached Guzzle as `null` and a global CA bundle as Guzzle's default `true`,
+  and a client resolved before `Http::swap()` sent a real request that failed only because its host
+  was `.invalid`. The README had said `Http::globalOptions()` applied.
 
 ## Facts worth not rediscovering
 
@@ -133,8 +133,8 @@ like clutter to be tidied away:
   shared key is claimed by every package that binds it. When each Laravel API wrapper bound its
   adapter there, `singleton()` on the bound key meant the last provider registered supplied its
   adapter and timeouts to every manager, and took the others' bindings over. A fallback would bring
-  that back: an older sibling or an unrelated library can still bind the shared key, and picking
-  it up silently would also put the traffic outside `Http::fake()`.
+  that back: an older release of another wrapper or an unrelated library can still bind the shared
+  key, and picking it up silently would also put the traffic outside `Http::fake()`.
 
   **It is a convention shared by the four Laravel API wrappers**, so an application meets one
   override style: each binds `<config key>.http_client`, **with `singletonIf()`, not
@@ -172,20 +172,19 @@ like clutter to be tidied away:
   `PendingRequest`'s constructor registers, which `buildBeforeSendingHandler()` runs *inside*
   the stack the adapter drives.
 
-  This documentation said neither fires until 2026-09-13, when a sibling wrapper's test
-  counted a `RequestSending` it did not expect. The Telescope conclusion was right and the
-  mechanism given for it was half wrong — plausible enough to be copied into the next
-  wrapper. `TransportTest::request_sending_fires_and_response_received_does_not` and
-  `a_connection_failure_raises_request_sending_and_nothing_to_match_it` now measure all three,
-  and pass on Laravel 12.61.1 and 13.31.0.
-- **`failOnDeprecation` is inert in a Testbench package without help, and the provider needs
-  three probes, not two.** Laravel's `HandleExceptions` replaces PHPUnit's error handler when
-  the application boots. `withoutDeprecationHandling()` in `setUp()` restores it for
-  test-executed paths — but Testbench boots the application inside `parent::setUp()`, before
-  that line runs, so the provider's `register()` **and** `boot()` have both already run under
-  the swallowing handler. Each is covered separately, against an application built in the test
-  body: `registering_the_provider_binds_the_manager_and_merges_the_config` for `register()`,
-  `booting_the_provider_registers_the_config_to_publish` for `boot()`.
+  This documentation said neither fires until 2026-09-13, when `hampel/binarylane-api-laravel`'s
+  test counted a `RequestSending` it did not expect. The Telescope conclusion was right and the
+  mechanism given for it was half wrong — plausible enough to be copied into the next wrapper.
+  `TransportTest::request_sending_fires_and_response_received_does_not` and
+  `a_connection_failure_raises_request_sending_and_nothing_to_match_it` now measure all three, and
+  pass on Laravel 12.61.1 and 13.31.0. - **`failOnDeprecation` is inert in a Testbench package
+  without help, and the provider needs three probes, not two.** Laravel's `HandleExceptions`
+  replaces PHPUnit's error handler when the application boots. `withoutDeprecationHandling()` in
+  `setUp()` restores it for test-executed paths — but Testbench boots the application inside
+  `parent::setUp()`, before that line runs, so the provider's `register()` **and** `boot()` have
+  both already run under the swallowing handler. Each is covered separately, against an application
+  built in the test body: `registering_the_provider_binds_the_manager_and_merges_the_config` for
+  `register()`, `booting_the_provider_registers_the_config_to_publish` for `boot()`.
 
   **Covering one does not cover the other.** `register()` holds the bindings, but `boot()`
   still calls framework API — `runningInConsole()`, `publishes()`, `configPath()` — on a
