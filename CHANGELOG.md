@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## Unreleased
+
+- Minimum Laravel versions are now 12.71 and 13.40; `illuminate/*` requires `^12.71|^13.40`
+
 ## 1.2.0 (2026-09-14)
 
 - **Breaking:** the transport is bound under the container key `xenforo.http_client` instead of

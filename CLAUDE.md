@@ -19,6 +19,41 @@ committed. A tool release can fail CI with nothing changed here. Before tagging,
 2.2.14 and Larastan 3.12.1 appeared between the local check and the push, and the 1.2.0 release
 went red on both Laravel 13 jobs while `composer check` was clean.
 
+## The Laravel floors are the lowest releases Composer will install
+
+`illuminate/*` requires `^12.71|^13.40`, and PHP `>=8.3`. **Those floors are set by published
+security advisories, not by anything this package uses.** Composer 2.9 and later refuse a release
+affected by one, so the `^12.0|^13.0` this package declared until 2026-11-24 promised releases
+that neither a consumer nor the `--prefer-lowest` job could install. That job was quietly testing
+12.71.0 while claiming 12.0.
+
+Measured on PHP 8.3 with Composer 2.11.1 on 2026-11-24: 12.70.0 and 13.39.0 refused on
+advisories, 12.71.0 and 13.40.0 resolved, and the suite and PHPStan level 10 passed at both
+floors. **The numbers move whenever a new advisory lands**, so re-measure rather than copy them.
+When the `--prefer-lowest` job stops resolving, that is the cause: raise the floor to what
+resolves.
+
+```bash
+php8.3 "$(command -v composer)" update     # a lock, resolved on 8.3; without one every partial update is refused
+php8.3 "$(command -v composer)" update "laravel/framework:12.70.0" "orchestra/testbench:^10.0" -W --dry-run
+php8.3 "$(command -v composer)" update "laravel/framework:12.71.0" "orchestra/testbench:^10.0" -W --dry-run
+php8.3 "$(command -v composer)" update "laravel/framework:13.39.0" -W --dry-run
+php8.3 "$(command -v composer)" update "laravel/framework:13.40.0" -W --dry-run
+```
+
+**Read the message, not the exit code.** Every refusal exits non-zero — 2 for an advisory, but
+also 3 or 1 for refusals that look like an answer without being one:
+
+- **no lock file** refuses any partial update outright, exit 3;
+- **a 12.x request without `orchestra/testbench:^10.0`** fails on the locked Testbench 11's own
+  Laravel 13 requirement;
+- **naming `illuminate/support` instead of `laravel/framework`** exits 1 without mentioning an
+  advisory. Ask for the framework: Testbench installs it, and it `replace`s every component.
+
+Only `these were not loaded, because they are affected by security advisories` is the answer. Run
+it in a scratch copy made from `git ls-files`, not `git archive`, which drops the `export-ignore`d
+`tests/` and `phpunit.xml` that the suite and PHPStan then need.
+
 ## Layout
 
 | path | what it is |

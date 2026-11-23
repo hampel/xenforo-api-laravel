@@ -28,7 +28,7 @@ different exceptions rather than both becoming an unsuccessful response.
 
 ## Requirements
 
-PHP 8.3 or later, and Laravel 12 or 13.
+PHP 8.3 or later; Laravel 12.71 or later, or 13.40 or later.
 
 Laravel Zero is supported too, with two extra steps covered under Installation. It needs the
 HTTP component, which an application opts into with `php <app> app:install http` (that command
