@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## 1.2.1 (2026-11-24)
 
 - Minimum Laravel versions are now 12.71 and 13.40; `illuminate/*` requires `^12.71|^13.40`
 - Minimum Guzzle versions are now 7.15.2 and 8.1, and PSR-7 2.13 and 3.1: `guzzlehttp/guzzle`
