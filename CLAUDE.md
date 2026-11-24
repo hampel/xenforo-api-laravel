@@ -55,9 +55,9 @@ it in a scratch copy made from `git ls-files`, not `git archive`, which drops th
 `tests/` and `phpunit.xml` that the suite and PHPStan then need.
 
 **Guzzle and PSR-7 follow the same rule**: `guzzlehttp/guzzle` requires `^7.15.2|^8.1` and
-`guzzlehttp/psr7` `^2.13|^3.1`, raised on 2026-11-24 from `^7.8|^8.0` and `^2.0|^3.0`. Measured
-the same way that day: Guzzle 7.15.1 and 8.0.0 and PSR-7 2.12.0 refused on advisories, and PSR-7
-3.0.0 did not resolve beside any installable Guzzle. The suite and PHPStan passed at both Laravel floors
+`guzzlehttp/psr7` `^2.13|^3.1`, raised on 2026-11-24 from `^7.8|^8.0` and `^2.0|^3.0`. Measured the
+same way that day: Guzzle 7.15.1 and 8.0.0 and PSR-7 2.12.0 refused on advisories, and PSR-7 3.0.0
+did not resolve beside any installable Guzzle. The suite and PHPStan passed at both Laravel floors
 with `--prefer-lowest`, which picks Guzzle 7.15.2 and PSR-7 2.13.0, and at Laravel 13.40.0 with
 Guzzle 8.1.0 and PSR-7 3.1.0, a corner CI does not run.
 
