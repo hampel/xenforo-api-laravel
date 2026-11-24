@@ -19,7 +19,7 @@ committed. A tool release can fail CI with nothing changed here. Before tagging,
 2.2.14 and Larastan 3.12.1 appeared between the local check and the push, and the 1.2.0 release
 went red on both Laravel 13 jobs while `composer check` was clean.
 
-## The Laravel floors are the lowest releases Composer will install
+## The floors are the lowest releases Composer will install
 
 `illuminate/*` requires `^12.71|^13.40`, and PHP `>=8.3`. **Those floors are set by published
 security advisories, not by anything this package uses.** Composer 2.9 and later refuse a release
@@ -53,6 +53,24 @@ also 3 or 1 for refusals that look like an answer without being one:
 Only `these were not loaded, because they are affected by security advisories` is the answer. Run
 it in a scratch copy made from `git ls-files`, not `git archive`, which drops the `export-ignore`d
 `tests/` and `phpunit.xml` that the suite and PHPStan then need.
+
+**Guzzle and PSR-7 follow the same rule**: `guzzlehttp/guzzle` requires `^7.15.2|^8.1` and
+`guzzlehttp/psr7` `^2.13|^3.1`, raised on 2026-11-24 from `^7.8|^8.0` and `^2.0|^3.0`. Measured
+the same way that day: Guzzle 7.15.1 and 8.0.0 and PSR-7 2.12.0 refused on advisories, and PSR-7
+3.0.0 did not resolve beside any installable Guzzle. The suite and PHPStan passed at both Laravel floors
+with `--prefer-lowest`, which picks Guzzle 7.15.2 and PSR-7 2.13.0, and at Laravel 13.40.0 with
+Guzzle 8.1.0 and PSR-7 3.1.0, a corner CI does not run.
+
+```bash
+php8.3 "$(command -v composer)" update "guzzlehttp/guzzle:7.15.1" -W --dry-run
+php8.3 "$(command -v composer)" update "guzzlehttp/guzzle:8.0.0" -W --dry-run
+php8.3 "$(command -v composer)" update "guzzlehttp/psr7:2.12.0" "guzzlehttp/guzzle:^7.15.2" -W --dry-run
+php8.3 "$(command -v composer)" update "guzzlehttp/psr7:3.0.0" "guzzlehttp/guzzle:^8.1" -W --dry-run
+```
+
+**Name the Guzzle major beside a PSR-7 request.** `-W` does not unlock Guzzle, which depends on
+PSR-7 rather than the other way round, so PSR-7 3.x against a lock holding Guzzle 7, or 2.x
+against one holding Guzzle 8, is refused for the lock and not for an advisory.
 
 ## Layout
 
